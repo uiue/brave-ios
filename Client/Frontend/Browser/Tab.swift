@@ -43,7 +43,8 @@ struct TabState {
 
 class Tab: NSObject {
     var id: String?
-    
+    var alertShownCount: Int = 0
+    var blockAllAlerts: Bool = false
     private(set) var type: TabType = .regular
     
     var isPrivate: Bool {
