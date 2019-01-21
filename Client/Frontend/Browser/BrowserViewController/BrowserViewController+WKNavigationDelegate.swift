@@ -196,7 +196,11 @@ extension BrowserViewController: WKNavigationDelegate {
 
                 webView.configuration.preferences.javaScriptEnabled = !domainForShields.isShieldExpected(.NoScript)
             }
-            
+            // Reset the block alert bool on new host. 
+            if let newHost: String = url.host, let oldHost: String = webView.url?.host, newHost != oldHost {
+                self.tabManager.selectedTab?.alertShownCount = 0
+                self.tabManager.selectedTab?.blockAllAlerts = false
+            }
             decisionHandler(.allow)
             return
         }
