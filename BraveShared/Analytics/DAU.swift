@@ -22,6 +22,8 @@ public class DAU {
     
     private var launchTimer: Timer?
     private let today: Date
+    /// Whether a current ping attempt is being made
+    private var processingPing = false
     private var todayComponents: DateComponents {
         return DAU.calendar.components([.day, .month, .year, .weekday], from: today)
     }
@@ -35,6 +37,11 @@ public class DAU {
     @discardableResult public func sendPingToServer() -> Bool {
         if AppConstants.BuildChannel == .developer {
             log.info("Development build detected, no server ping.")
+            return false
+        }
+        
+        if processingPing {
+            log.info("Currently processing a ping, blocking ping re-attempt")
             return false
         }
         
@@ -56,6 +63,7 @@ public class DAU {
     }
     
     @objc public func sendPingToServerInternal() {
+        processingPing = true
         guard let paramsAndPrefs = paramsAndPrefsSetup() else {
             log.debug("dau, no changes detected, no server ping")
             return
@@ -86,6 +94,7 @@ public class DAU {
             Preferences.DAU.lastLaunchInfo.value = paramsAndPrefs.lastLaunchInfoPreference
             
             Preferences.DAU.lastPingFirstMonday.value = paramsAndPrefs.lastPingFirstMondayPreference
+            self.processingPing = false
         }
         
         task.resume()
@@ -116,7 +125,6 @@ public class DAU {
         }
         
         guard let dauStatParams = dauStatParams(firstPing: firstLaunch) else {
-            log.debug("dau, no changes detected, no server ping")
             return nil
         }
         
