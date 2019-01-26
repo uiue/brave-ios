@@ -201,6 +201,20 @@ extension BrowserViewController: WKNavigationDelegate {
                 self.tabManager.selectedTab?.alertShownCount = 0
                 self.tabManager.selectedTab?.blockAllAlerts = false
             }
+            
+            //Cookie Blocking code below
+            if let tab = tabManager[webView] {
+                tab.userScriptManager?.isCookieBlockingEnabled = Preferences.Privacy.blockAllCookies.value
+            }
+            
+            if let rule = BlocklistName.cookie.rule {
+                if Preferences.Privacy.blockAllCookies.value {
+                    webView.configuration.userContentController.add(rule)
+                } else {
+                    webView.configuration.userContentController.remove(rule)
+                }
+            }
+            
             decisionHandler(.allow)
             return
         }

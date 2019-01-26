@@ -59,12 +59,6 @@ public final class Bookmark: NSManagedObject, WebsitePresentable, Syncable, CRUD
         return nil
     }
     
-    /// If sync is not used, we still utilize its syncOrder algorithm to determine order of bookmarks.
-    /// Base order is needed to distinguish between bookmarks on different devices and platforms.
-    static var baseOrder: String {
-        return Sync.shared.baseSyncOrder ?? "0.0."
-    }
-    
     override public func awakeFromInsert() {
         super.awakeFromInsert()
         lastVisited = created
@@ -209,7 +203,7 @@ public final class Bookmark: NSManagedObject, WebsitePresentable, Syncable, CRUD
         //  (e.g. sync sent down bookmark before parent folder)
         if bk.isFolder {
             // Find all children and attach them
-            if let children = Bookmark.getChildren(forFolderUUID: bk.syncUUID) {
+            if let children = Bookmark.getNonFolderChildren(forFolderUUID: bk.syncUUID) {
                 
                 // TODO: Setup via bk.children property instead
                 children.forEach { $0.syncParentUUID = bk.syncParentUUID }
@@ -379,6 +373,16 @@ public final class Bookmark: NSManagedObject, WebsitePresentable, Syncable, CRUD
         delete()
     }
     
+    /// Removes a single Bookmark of a given URL.
+    /// In case of having two bookmarks with the same url, a bookmark to delete is chosen randomly.
+    public class func remove(forUrl url: URL) {
+        let context = DataController.newBackgroundContext()
+        let predicate = isFavoriteOrBookmarkByUrlPredicate(url: url, getFavorites: false)
+        
+        let record = first(where: predicate, context: context)
+        record?.remove()
+    }
+    
     private func removeFolderAndSendSyncRecords(uuid: [Int]?) {
         if !isFolder { return }
         
@@ -412,7 +416,7 @@ extension Bookmark {
         return NSPredicate(format: "\(urlKeyPath) == %@ AND \(isFavoriteKeyPath) == \(NSNumber(value: getFavorites))", url.absoluteString)
     }
     
-    public static func getChildren(forFolderUUID syncUUID: [Int]?, ignoreFolders: Bool = false) -> [Bookmark]? {
+    public static func getNonFolderChildren(forFolderUUID syncUUID: [Int]?) -> [Bookmark]? {
         guard let searchableUUID = SyncHelpers.syncDisplay(fromUUID: syncUUID) else {
             return nil
         }
@@ -420,8 +424,8 @@ extension Bookmark {
         let syncParentDisplayUUIDKeyPath = #keyPath(Bookmark.syncParentDisplayUUID)
         let isFolderKeyPath = #keyPath(Bookmark.isFolder)
         
-        let predicate = NSPredicate(format: "\(syncParentDisplayUUIDKeyPath) == %@ AND \(isFolderKeyPath) == %@",
-            searchableUUID, NSNumber(value: ignoreFolders))
+        let predicate = NSPredicate(format: "\(syncParentDisplayUUIDKeyPath) == %@ AND \(isFolderKeyPath) == 0",
+            searchableUUID)
         
         return all(where: predicate)
     }
@@ -450,14 +454,6 @@ extension Bookmark {
         let predicate = NSPredicate(format: "isFavorite == NO")
         
         return all(where: predicate) ?? []
-    }
-    
-    public class func remove(forUrl url: URL) {
-        let context = DataController.newBackgroundContext()
-        let predicate = isFavoriteOrBookmarkByUrlPredicate(url: url, getFavorites: false)
-        
-        let record = first(where: predicate, context: context)
-        record?.delete()
     }
     
     /// Gets all nested bookmarks recursively.
